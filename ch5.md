@@ -197,28 +197,34 @@
 	- 선 계산
 		- 캐시 스탬피드가 문제되는 이유는 데이터가 만료되는 시점에 여러 애플리케이션에서 동시다발적으로 이를 인지하고 작업을 동시에 진행하기 때문이다.
 		- 키가 실제로 만료되기 전에 이 값을 미리 갱신해준다면 불필요한 프로세스를 줄일 수 있다.
-		-  단순하게 데이터를 가져오는 방법보다 더 많은 리소스를 사용한다고 볼 수도 있지만 상황에 따라 캐시 스탬피드 현상을 줄일 수도 있다.
+		- 단순하게 데이터를 가져오는 방법보다 더 많은 리소스를 사용한다고 볼 수도 있지만 상황에 따라 캐시 스탬피드 현상을 줄일 수도 있다.
 		- expiry_gap 값을 적절히 설정해주는 것이 중요하다.
 	```
 	// look aside 방식처럼 동작
-	def fetch(key):
-		value = redis.get(key)
-		if(!value):
-			value = db.fetch(key)
-			redis.set(value)
-		return value
+	fun fetch(key: String): String? {
+	    var value = redis.get(key)
+	
+	    if (value == null) {
+	        value = db.fetch(key)
+	        redis.set(key, value)
+	    }
+	
+	    return value
+	}
 
 	// 실제로 만료되기 전 랜덤으로 데이터베이스에 접근해서 데이터를 읽어와 캐시의 값을 갱신
-	def fetch(key, expiry_gap):
-		ttl = redis.ttl(key)
-
-		if ttl - (random() * expiry_gap) > 0:
-			return redis.get(key)
-		
-		else:
-			value = db.fetch(key)
-			redis.set(value, KEY_TTL)
-			return value
+	fun fetchWithExpiryGap(key: String, expiryGap: Int): String? {
+	    val ttl = redis.ttl(key) // Redis에 남은 TTL을 초 단위로 가져옴
+	
+	    // TTL이 아직 충분하고, 무작위 값보다 크면 캐시 반환
+	    if (ttl > (Random.nextDouble() * expiryGap)) {
+	        return redis.get(key)
+	    } else {
+	        val value = db.fetch(key)
+	        redis.setex(key, KEY_TTL, value) // TTL과 함께 저장
+	        return value
+	    }
+	}
 	```
 
 
